@@ -1,4 +1,5 @@
 'use strict';
+
 // 3rd Party Resources
 const express = require('express');
 const cors = require('cors');
@@ -6,6 +7,17 @@ const morgan = require('morgan');
 const AWS = require('aws-sdk');
 const http = require('http');
 const WebSocket = require('ws');
+const url = require('url');
+const uuidv4 = require('uuid').v4;
+
+// Event-Handlers
+const {
+  handleAddedToken,
+  handleChange,
+  handleClose,
+  handleMove,
+  setGlobals,
+} = require('./Handlers/eventHandlers');
 
 // AWS config
 AWS.config.update({
@@ -24,27 +36,58 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/', (req,res) => res.send('this is the back end of Ptolemy'));
+app.get('/', (req, res) => res.send('this is the back end of Ptolemy'));
 
 const server = http.createServer(app);
 
+const wss = new WebSocket.Server({ server });
 
-const wss = new WebSocket.Server({ server: server });
+const connections = {};
+const users = {};
+const tokens = {};
 
-wss.on('connection', function connection(ws) {
-  console.log('A new client has connected');
-  ws.send('Welcome to Ptolemy intrepid hero!');
+// Set global variables for event handlers
+setGlobals(connections, users, tokens);
 
-  ws.on('error', console.error);
+wss.on('connection', (connection, req) => {
+  const { username, role } = url.parse(req.url, true).query;
+  const uuid = uuidv4();
+  console.log(
+    `A new client named ${username} with the role: ${role} and web-socket Id: ${uuid} has connected.`
+  );
+  connection.send(`Welcome to Ptolemy: ${username} you intrepid hero!`);
 
-  ws.on('message', function message(data) {
-    console.log('received: %s', data);
+  connections[uuid] = connection;
+
+  users[uuid] = {
+    username,
+    role: role || 'PC',
+    state: [],
+  };
+
+  connection.on('message', (data) => {
+    const message = JSON.parse(data);
+    const { type, payload } = message;
+
+    switch (type) {
+      case 'addedToken':
+        handleAddedToken(payload, uuid);
+        break;
+      case 'move':
+        handleMove(payload, uuid);
+        break;
+      case 'change':
+        handleChange(payload, uuid);
+        break;
+      default:
+        console.log('Unknown message type:', type);
+    }
   });
 
-  ws.send('something');
+  connection.on('error', console.error);
+
+  connection.on('close', () => handleClose(uuid));
 });
-
-
 
 module.exports = {
   server,
