@@ -1,22 +1,24 @@
-'use strict';
+// In ./Handlers/eventHandlers.js
 
-const Token = require('../TokenClass');
-let connections = {};
-let users = {};
-let tokens = {};
+let connections = {}; // Maps UUID to WebSocket connection
+let users = {};       // Maps UUID to user data
+let tokens = {};      // Maps token IDs to token objects
+let rooms = {};       // Maps room names to client connections
 
-const setGlobals = (conns, usrs, tkns) => {
+const setGlobals = (conns, usrs, tkns, rms) => {
   connections = conns;
   users = usrs;
   tokens = tkns;
+  rooms = rms;
 };
 
-const broadcastToUsers = () => {
-  Object.keys(connections).forEach((uuid) => {
-    const connection = connections[uuid];
-    const event = JSON.stringify(users);
-    connection.send(event);
-  });
+const broadcastToUsers = (roomName) => {
+  if (rooms[roomName]) {
+    rooms[roomName].forEach((client) => {
+      const event = JSON.stringify(users);
+      client.connection.send(event);
+    });
+  }
 };
 
 const handleAddedToken = (data, uuid) => {
@@ -25,7 +27,9 @@ const handleAddedToken = (data, uuid) => {
   const newToken = new Token(image, name, size, position);
   user.state.push(newToken);
   tokens[newToken.tokenId] = newToken; // Store token globally
-  broadcastToUsers();
+  // Broadcast token update to all users in the same room
+  const roomName = Object.keys(rooms).find(name => rooms[name].some(client => client.uuid === uuid));
+  broadcastToUsers(roomName);
 };
 
 const handleMove = (data, uuid) => {
@@ -36,7 +40,9 @@ const handleMove = (data, uuid) => {
   if (token) {
     token.position = position;
     tokens[tokenId].position = position; // Update global tokens
-    broadcastToUsers();
+    // Broadcast move update to all users in the same room
+    const roomName = Object.keys(rooms).find(name => rooms[name].some(client => client.uuid === uuid));
+    broadcastToUsers(roomName);
   } else {
     console.log(`Token not found for user: ${uuid}`);
   }
@@ -65,10 +71,21 @@ const handleChange = (data, uuid) => {
     }
   }
 
-  broadcastToUsers();
+  // Broadcast change update to all users in the same room
+  const roomName = Object.keys(rooms).find(name => rooms[name].some(client => client.uuid === uuid));
+  broadcastToUsers(roomName);
 };
 
 const handleClose = (uuid) => {
+  // Remove client from their room
+  Object.keys(rooms).forEach(roomName => {
+    rooms[roomName] = rooms[roomName].filter(client => client.uuid !== uuid);
+    // If the room is empty, delete it
+    if (rooms[roomName].length === 0) {
+      delete rooms[roomName];
+    }
+  });
+
   delete connections[uuid];
   delete users[uuid];
   broadcastToUsers();
