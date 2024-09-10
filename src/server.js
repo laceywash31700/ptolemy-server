@@ -6,13 +6,15 @@ const socket = require('socket.io');
 
 const app = express();
 
+app.options('*', cors()); // Handle preflight requests
+
 // Configure CORS for Express
 app.use(
   cors({
     origin: [
       'http://localhost:3000', // Development server
       'http://127.0.0.1:5173', // Another local development URL
-      'https://ptolemyvtt.netlify.app/', // Production domain
+      'https://ptolemyvtt.netlify.app', // Production domain
     ],
     methods: ['GET', 'POST'],
   })
@@ -31,7 +33,7 @@ const io = new socket.Server(server, {
     origin: [
       'http://localhost:3000',
       'http://127.0.0.1:5173',
-      'https://ptolemyvtt.netlify.app/',
+      'https://ptolemyvtt.netlify.app',
     ],
     methods: ['GET', 'POST'],
     transports: ['websocket'],
