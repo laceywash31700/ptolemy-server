@@ -12,7 +12,7 @@ app.use(
     origin: [
       'http://localhost:3000', // Development server
       'http://127.0.0.1:5173', // Another local development URL
-      'https://66da2b7a9f3d28a1e0256f7e--ptolemyvtt.netlify.app', // Production domain
+      'https://ptolemyvtt.netlify.app/', // Production domain
     ],
     methods: ['GET', 'POST'],
   })
@@ -31,9 +31,10 @@ const io = new socket.Server(server, {
     origin: [
       'http://localhost:3000',
       'http://127.0.0.1:5173',
-      'https://66da2b7a9f3d28a1e0256f7e--ptolemyvtt.netlify.app',
+      'https://ptolemyvtt.netlify.app/',
     ],
     methods: ['GET', 'POST'],
+    transports: ['websocket'],
   },
 });
 
